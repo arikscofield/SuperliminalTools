@@ -50,7 +50,8 @@ internal static class TASInput
 
         return passthrough || !DemoActions.Axes.Contains(actionName)
             ? originalResult
-            : recording.GetRecordedAxis(actionName);
+            : recording.
+                GetRecordedAxis(actionName);
     }
 
     public static void StartPlayback(DemoRecorder recordingToPlay)

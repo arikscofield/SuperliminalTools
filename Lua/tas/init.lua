@@ -10,16 +10,16 @@ local M = {}
 M.CsvSink = CsvSink
 
 function M.new(sink)
-  if not sink then
-    if __tas_live then
-      sink = require("tas.sink_live").new()
-    else
-      sink = CsvSink.new()
+    if not sink then
+        if __tas_live then
+            sink = require("tas.sink_live").new()
+        else
+            sink = CsvSink.new()
+        end
     end
-  end
-  -- __tas_game is the C# GameState bridge live, and nil offline. Commands that
-  -- need it assert clearly when it's missing.
-  return Commands.build(sink, __tas_game)
+    -- __tas_game is the C# GameState bridge live, and nil offline. Commands that
+    -- need it assert clearly when it's missing.
+    return Commands.build(sink, __tas_game)
 end
 
 return M

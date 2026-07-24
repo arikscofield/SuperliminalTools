@@ -98,6 +98,8 @@ public sealed class LiveScript
         if (_co.Coroutine.State == CoroutineState.Dead)
         {
             Finished = true;
+            foreach (var a in AxisNames) _axis[a] = 0f;   // don't let the last
+            foreach (var b in ButtonNames) _cur[b] = false; // frame's input leak
             return;
         }
 

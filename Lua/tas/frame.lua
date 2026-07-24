@@ -17,10 +17,10 @@ Frame.SPEED = "Speed"
 -- Define the columsn headers
 Frame.COLUMNS = {}
 for _, name in ipairs(Frame.AXES) do
-	Frame.COLUMNS[#Frame.COLUMNS + 1] = name
+    Frame.COLUMNS[#Frame.COLUMNS + 1] = name
 end
 for _, name in ipairs(Frame.BUTTONS) do
-	Frame.COLUMNS[#Frame.COLUMNS + 1] = name
+    Frame.COLUMNS[#Frame.COLUMNS + 1] = name
 end
 Frame.COLUMNS[#Frame.COLUMNS + 1] = Frame.RESET
 Frame.COLUMNS[#Frame.COLUMNS + 1] = Frame.SPEED
@@ -28,10 +28,10 @@ Frame.COLUMNS[#Frame.COLUMNS + 1] = Frame.SPEED
 
 -- True if `name` is a real button. used for error messages
 function Frame.is_button(name)
-	for _, b in ipairs(Frame.BUTTONS) do
-		if b == name then return true end
-	end
-	return false
+    for _, b in ipairs(Frame.BUTTONS) do
+        if b == name then return true end
+    end
+    return false
 end
 
 

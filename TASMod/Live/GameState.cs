@@ -79,14 +79,70 @@ public sealed class GameState
         var (yaw, pitch) = CurrentFacing();
         return DynValue.NewTuple(DynValue.NewNumber(yaw), DynValue.NewNumber(pitch));
     }
+    
+    /// <summary>
+    /// Degrees of rotation produced per 1.0 of Look axis, for the mouse path:
+    ///   yaw_degrees   = look_h * scale.x
+    ///   pitch_degrees = look_v * scale.y
+    /// Reads the live MouseLook sensitivity and folds in the invert-axis prefs, so
+    /// a script can turn a desired angle (in degrees) straight into a look delta.
+    /// Returns 0 for an axis whose MouseLook isn't present (script guards against it).
+    /// </summary>
+    public DynValue look_scale()
+    {
+        float sx = 0f, sy = 0f;
+        var p = Player;
+        var c = Cam;
+        var yawLook = p != null ? p.GetComponent<MouseLook>() : null;    // player: MouseX / yaw
+        var pitchLook = c != null ? c.GetComponent<MouseLook>() : null;  // camera: MouseY / pitch
+        if (yawLook != null) sx = yawLook.sensitivityX * InvertAxis.GetInvertXAxisMultiplier();
+        if (pitchLook != null) sy = pitchLook.sensitivityY * InvertAxis.GetInvertYAxisMultiplier();
+        return DynValue.NewTuple(DynValue.NewNumber(sx), DynValue.NewNumber(sy));
+    }
 
     // ---- target selection ----------------------------------------------
+    
+    
+    // helper to aim at the collider/renderer
+    // bounds center — that's what "look at the object" should mean.
+    private static Vector3 AimCenter(Transform t)
+    {
+        if (t == null) return Vector3.zero;
+        var col = t.GetComponentInChildren<Collider>();
+        if (col != null) return col.bounds.center;
+        var rend = t.GetComponentInChildren<Renderer>();
+        if (rend != null) return rend.bounds.center;
+        return t.position;
+    }
+    
+    /// <summary>
+    /// Names + distances of nearby grabbables, nearest first. Call it from a script
+    /// (tas.grabbables()) to discover what to pass to nearest("..."). Logs and returns.
+    /// </summary>
+    public string list_grabbables(int max = 15)
+    {
+        var p = Player;
+        if (p == null) return "";
+        var origin = p.transform.position;
+
+        var items = new List<(string name, float d)>();
+        foreach (var dt in Object.FindObjectsOfType<DropTriggerScript>())
+            items.Add((dt.name, Vector3.Distance(AimCenter(dt.transform), origin)));
+        items.Sort((a, b) => a.d.CompareTo(b.d));
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"grabbables ({items.Count}):");
+        for (int i = 0; i < items.Count && i < max; i++)
+            sb.AppendLine($"  {items[i].name}  ({items[i].d:0.0}m)");
+        var s = sb.ToString();
+        Debug.Log(s);   // surfaces in the Unity/player log
+        return s;
+    }
 
     /// <summary>
-    /// Nearest grabbable object, optionally filtered by a case-insensitive name substring.
-    /// Grabbables in Superliminal have a Rigidbody, so that's our candidate set.
-    /// Returns a handle (>= 0) or -1 if nothing matched. Nearest-by-distance is
-    /// independent of enumeration order, so it stays deterministic.
+    /// Nearest GRABBABLE object (has a DropTriggerScript — the game's own grab
+    /// marker; these sit on the "CanGrab" layer), optionally filtered by a
+    /// case-insensitive name substring. Returns a handle (>= 0) or -1.
     /// </summary>
     public int nearest(string nameFilter = null)
     {
@@ -99,11 +155,12 @@ public sealed class GameState
         bool wildcard = string.IsNullOrEmpty(nameFilter) || nameFilter == "*";
         string needle = wildcard ? null : nameFilter.ToLowerInvariant();
 
-        foreach (var body in Object.FindObjectsOfType<Rigidbody>())
+        foreach (var dt in Object.FindObjectsOfType<DropTriggerScript>())
         {
-            if (!wildcard && !body.name.ToLowerInvariant().Contains(needle)) continue;
-            float sq = (body.transform.position - origin).sqrMagnitude;
-            if (sq < bestSq) { bestSq = sq; best = body.transform; }
+            var t = dt.transform;
+            if (!wildcard && !t.name.ToLowerInvariant().Contains(needle)) continue;
+            float sq = (AimCenter(t) - origin).sqrMagnitude;
+            if (sq < bestSq) { bestSq = sq; best = t; }
         }
 
         if (best == null) return -1;
@@ -114,7 +171,7 @@ public sealed class GameState
     public DynValue target_pos(int handle)
     {
         var t = Resolve(handle);
-        return Vec(t != null ? t.position : Vector3.zero);
+        return Vec(t != null ? AimCenter(t) : Vector3.zero);
     }
 
     public double target_distance(int handle)
@@ -122,7 +179,7 @@ public sealed class GameState
         var t = Resolve(handle);
         var p = Player;
         if (t == null || p == null) return -1;
-        return Vector3.Distance(p.transform.position, t.position);
+        return Vector3.Distance(p.transform.position, AimCenter(t));
     }
 
     // ---- aim errors (yaw_err, pitch_err in degrees) ---------------------
@@ -135,7 +192,7 @@ public sealed class GameState
     {
         var t = Resolve(handle);
         if (t == null) return Err(0, 0);
-        return AimErrorToPoint(t.position);
+        return AimErrorToPoint(AimCenter(t));
     }
 
     public DynValue aim_error_point(double x, double y, double z)
