@@ -36,7 +36,9 @@ public sealed class DemoFileDialog
         new("CSV File (*.csv)", "csv"),
         new("All Files (*.*)", "*")
 #else
+        new("Demos & Scripts (*.csv, *.lua)", "csv", "lua"),
         new("CSV File (*.csv)", "csv"),
+        new("Lua Script (*.lua)", "lua"),
         new("All Files", "*")
 #endif
     };

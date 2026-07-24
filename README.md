@@ -1,12 +1,20 @@
 # SuperliminalTools
 
+A fork that adds the option to use lua for tas scripting.
+
 A BepInEx plugin for Superliminal for speedrun practice and tool assisted speedrunning.
 
 ## Installation
 
 Download the [release](https://github.com/Micrologist/SuperliminalTools/releases/latest) matching your game version and extract the contents into your game folder.
 
+Extract the entire `Lua/tas` folder inside of the `demos/` folder. So it looks like `/demos/tas/*.lua files`
+
 ## Usage
+
+Place a `MoonSharp.Interpreter.dll` alongside the `superliminaltools.dll` in the BepInEx `/plugins` folder.
+
+Create a .lua file inside the `/demos` folder, with the line `local tas = require("tas").new()` at the top. 
 
 Use the included `.bat` files to launch the game in practice mod, TAS mod, or with no mods.
 

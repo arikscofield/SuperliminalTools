@@ -54,6 +54,9 @@ public sealed class DemoRecorder : MonoBehaviour
     private bool _usingCustomSpeed;
     private float _customSpeedMultiplier = 1f;
 
+    private Live.LiveScript _live;
+    private int _liveProducedFrame = -1;
+
     private DemoData _data;
     private DemoFileDialog _fileDialog;
     private string _lastOpenedFile;
@@ -117,24 +120,40 @@ public sealed class DemoRecorder : MonoBehaviour
         }
         else if (_playingBack)
         {
-            // Check for checkpoint reset at current frame
-            if (_data.GetCheckpointReset(CurrentFrame))
-            {
-                Debug.Log($"{Time.time}: Checkpoint reset triggered on frame {CurrentFrame}");
-                _needsCheckpointReset = true;
-            }
+            EnsureLiveAdvanced();
 
-            // Check for speed change from CSV at current frame
-            var speed = _data.GetSpeed(CurrentFrame);
-            if (speed.HasValue)
+            if (_live != null)
             {
-                _usingCustomSpeed = true;
-                _customSpeedMultiplier = speed.Value;
-                ApplySpeed(speed.Value);
+                if (_live.Reset) _needsCheckpointReset = true;
+                if (_live.Speed.HasValue)
+                {
+                    _usingCustomSpeed = true;
+                    _customSpeedMultiplier = _live.Speed.Value;
+                    ApplySpeed(_live.Speed.Value);
+                }
+                if (_live.Finished) StopPlayback();
             }
+            else
+            {
+                // Check for checkpoint reset at current frame
+                if (_data.GetCheckpointReset(CurrentFrame))
+                {
+                    Debug.Log($"{Time.time}: Checkpoint reset triggered on frame {CurrentFrame}");
+                    _needsCheckpointReset = true;
+                }
 
-            if (CurrentFrame + 1 >= _data.FrameCount)
-                StopPlayback();
+                // Check for speed change from CSV at current frame
+                var speed = _data.GetSpeed(CurrentFrame);
+                if (speed.HasValue)
+                {
+                    _usingCustomSpeed = true;
+                    _customSpeedMultiplier = speed.Value;
+                    ApplySpeed(speed.Value);
+                }
+
+                if (CurrentFrame + 1 >= _data.FrameCount)
+                    StopPlayback();
+            }
         }
 
         if (_needsCheckpointReset)
@@ -207,6 +226,7 @@ public sealed class DemoRecorder : MonoBehaviour
 
         StartCoroutine(ResetLevelStateThen(() =>
         {
+            _lastOpenedFile = null;
             _data = DemoData.CreateEmpty();
 
             _data.LevelId = SceneManager.GetActiveScene().name;
@@ -235,6 +255,7 @@ public sealed class DemoRecorder : MonoBehaviour
                 TeleportToCheckpoint(checkpointId);
             }
 
+            _lastOpenedFile = null;
             _data = DemoData.CreateEmpty();
 
             _data.LevelId = SceneManager.GetActiveScene().name;
@@ -274,7 +295,15 @@ public sealed class DemoRecorder : MonoBehaviour
 
     private void StartPlayback()
     {
-        if (_data.FrameCount < 1 || _recording || _playingBack || _resetting) return;
+        if (_recording || _playingBack || _resetting) return;
+
+        if (IsLiveScript(_lastOpenedFile))
+        {
+            StartLivePlayback(_lastOpenedFile);
+            return;
+        }
+
+        if (_data.FrameCount < 1) return;
 
         if (!string.IsNullOrEmpty(_data.LevelId) && SceneManager.GetActiveScene().name != _data.LevelId)
         {
@@ -309,6 +338,9 @@ public sealed class DemoRecorder : MonoBehaviour
 
         _playbackSpeedIndex = 5;
         ApplyPlaybackSpeed();
+
+        _live = null;
+        _liveProducedFrame = -1;
 
         TASInput.disablePause = false;
         TASInput.StopPlayback();
@@ -355,29 +387,69 @@ public sealed class DemoRecorder : MonoBehaviour
             Components.Visual.RenderDistanceController.Instance.SetRendering(true);
         }
     }
+    
+    // Resume the live script at most once per game frame, lazily, so its input
+    // is ready the first time TASInput polls it in Update().
+    private void EnsureLiveAdvanced()
+    {
+        if (_live == null) return;
+        int f = CurrentFrame;
+        if (f == _liveProducedFrame) return;
+        _liveProducedFrame = f;
+        try
+        {
+            _live.Advance();
+        }
+        catch (MoonSharp.Interpreter.InterpreterException lex)
+        {
+            Debug.LogError($"Live script error on frame {f}: {lex.DecoratedMessage}");
+            StopPlayback();
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Live script error on frame {f}: {e}");
+            StopPlayback();
+        }
+    }
 
-    internal bool GetRecordedButton(string actionName) =>
-        _data.GetButton(actionName, Math.Min(CurrentFrame, _data.FrameCount - 1));
+    internal bool GetRecordedButton(string actionName)
+    {
+        if (_live != null) { EnsureLiveAdvanced(); return _live != null && _live.GetButton(actionName); }
+        return _data.GetButton(actionName, Math.Min(CurrentFrame, _data.FrameCount - 1));
+    }
+    internal bool GetRecordedButtonDown(string actionName)
+    {
+        if (_live != null) { EnsureLiveAdvanced(); return _live != null && _live.GetButtonDown(actionName); }
+        return _data.GetButtonDown(actionName, Math.Min(CurrentFrame, _data.FrameCount - 1));
+    }
 
-    internal bool GetRecordedButtonDown(string actionName) =>
-        _data.GetButtonDown(actionName, Math.Min(CurrentFrame, _data.FrameCount - 1));
+    internal bool GetRecordedButtonUp(string actionName)
+    {
+        if (_live != null) { EnsureLiveAdvanced(); return _live != null && _live.GetButtonUp(actionName); }
+        return _data.GetButtonUp(actionName, Math.Min(CurrentFrame, _data.FrameCount - 1));
+    }
 
-    internal bool GetRecordedButtonUp(string actionName) =>
-        _data.GetButtonUp(actionName, Math.Min(CurrentFrame, _data.FrameCount - 1));
-
-    internal float GetRecordedAxis(string actionName) =>
-        _data.GetAxis(actionName, Math.Min(CurrentFrame, _data.FrameCount - 1));
-
+    internal float GetRecordedAxis(string actionName)
+    {
+        if (_live != null) { EnsureLiveAdvanced(); return _live != null ? _live.GetAxis(actionName) : 0f; }
+        return _data.GetAxis(actionName, Math.Min(CurrentFrame, _data.FrameCount - 1));
+    }
     #endregion
 
     #region File Saving / Loading
 
+    private static bool IsLiveScript(string path) =>
+        !string.IsNullOrEmpty(path) && path.EndsWith(".lua", StringComparison.OrdinalIgnoreCase);
+    
     private void OpenDemo()
     {
         var path = _fileDialog.OpenPath();
         if (string.IsNullOrWhiteSpace(path)) return;
 
-        LoadFile(path);
+        if (IsLiveScript(path))
+            LoadLiveScript(path);
+        else
+            LoadFile(path);
     }
 
     private void SaveDemo()
@@ -404,8 +476,6 @@ public sealed class DemoRecorder : MonoBehaviour
         }
     }
 
-
-
     private void CheckForFileChanges()
     {
         // Only check for file changes if we have a loaded file and we're not currently recording or resetting
@@ -424,7 +494,10 @@ public sealed class DemoRecorder : MonoBehaviour
             {
                 Debug.Log($"File change detected: {_lastOpenedFile}");
                 StopPlayback();
-                StartCoroutine(ReloadFile());
+                if (IsLiveScript(_lastOpenedFile))
+                    StartCoroutine(ReloadLiveScript());
+                else
+                    StartCoroutine(ReloadFile());
             }
         }
         catch (Exception)
@@ -488,7 +561,34 @@ public sealed class DemoRecorder : MonoBehaviour
 
         return false;
     }
+    
+    private void LoadLiveScript(string path)
+    {
+        _lastOpenedFile = path;
+        _lastFileWriteTime = File.GetLastWriteTime(path);
+        Debug.Log($"Loaded live script: {path} (press F5 to run). Be on the target level first.");
+    }
 
+    public void StartLivePlayback(string scriptPath)
+    {
+        if (_recording || _playingBack || _resetting) return;
+
+        Live.LiveScript live;
+        try { live = new Live.LiveScript(scriptPath, Path.GetDirectoryName(scriptPath)); }
+        catch (Exception e) { Debug.LogError($"Failed to load live script: {e}"); return; }
+
+        StartCoroutine(ResetLevelStateThen(() =>
+        {
+            _live = live;
+            _liveProducedFrame = -1;
+            _recording = false;
+            _playingBack = true;
+            _demoStartFrame = Time.renderedFrameCount;
+
+            TASInput.disablePause = true;
+            TASInput.StartPlayback(this);
+        }));
+    }
 
 #if LEGACY
     [HideFromIl2Cpp]
@@ -512,6 +612,19 @@ public sealed class DemoRecorder : MonoBehaviour
         Debug.Log($"Reloading: {_lastOpenedFile}");
         if (LoadFile(_lastOpenedFile))
             StartPlayback();
+    }
+    
+    private IEnumerator ReloadLiveScript()
+    {
+        if (string.IsNullOrWhiteSpace(_lastOpenedFile) || !File.Exists(_lastOpenedFile))
+            yield break;
+
+        yield return null;
+
+        // Update the timestamp first so we don't re-trigger on our own reload.
+        _lastFileWriteTime = File.GetLastWriteTime(_lastOpenedFile);
+        Debug.Log($"Reloading live script: {_lastOpenedFile}");
+        StartLivePlayback(_lastOpenedFile);
     }
     #endregion
 
@@ -603,6 +716,9 @@ public sealed class DemoRecorder : MonoBehaviour
         return -1;
     }
 
+    // Public wrapper so the live-script bridge can read the current checkpoint.
+    public int CurrentCheckpointIndex() => GetCurrentCheckpointIndex();
+    
     #endregion
 
     #region Scene Reset
