@@ -23,6 +23,7 @@ bld/
 
 
 /Staging
+/PackageBase
 
 /GameLibs/**
 !/GameLibs/

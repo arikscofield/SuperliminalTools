@@ -33,7 +33,9 @@ public sealed class DemoFileDialog
     private static readonly ExtensionFilter[] OpenExtensionList =
     {
 #if LEGACY
+        new("Demos & Scripts (*.csv, *.lua)", "csv", "lua"),
         new("CSV File (*.csv)", "csv"),
+        new("Lua Script (*.lua)", "lua"),
         new("All Files (*.*)", "*")
 #else
         new("Demos & Scripts (*.csv, *.lua)", "csv", "lua"),

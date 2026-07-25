@@ -95,8 +95,18 @@ public sealed class GameState
         var c = Cam;
         var yawLook = p != null ? p.GetComponent<MouseLook>() : null;    // player: MouseX / yaw
         var pitchLook = c != null ? c.GetComponent<MouseLook>() : null;  // camera: MouseY / pitch
-        if (yawLook != null) sx = yawLook.sensitivityX * InvertAxis.GetInvertXAxisMultiplier();
-        if (pitchLook != null) sy = pitchLook.sensitivityY * InvertAxis.GetInvertYAxisMultiplier();
+        #if HAS_INVERT_MULTIPLIER
+            if (yawLook != null) sx = yawLook.sensitivityX * InvertAxis.GetInvertXAxisMultiplier();
+            if (pitchLook != null) sy = pitchLook.sensitivityY * InvertAxis.GetInvertYAxisMultiplier();
+        #elif LEGACY
+            var psm = GameManager.GM != null ? GameManager.GM.GetComponent<PlayerSettingsManager>() : null;
+            bool invertY = psm != null && psm.GetInvertYAxis();
+            if (yawLook != null) sx = yawLook.sensitivityX;
+            if (pitchLook != null) sy = pitchLook.sensitivityY * (invertY ? -1 : 1);
+        #else
+            if (yawLook != null) sx = yawLook.sensitivityX;
+            if (pitchLook != null) sy = pitchLook.sensitivityY * (InvertAxis.GetInvertYAxis() ? -1 : 1);
+        #endif
         return DynValue.NewTuple(DynValue.NewNumber(sx), DynValue.NewNumber(sy));
     }
 

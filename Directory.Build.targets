@@ -34,19 +34,28 @@
     <!-- Version 1.0.2019.11.12 -->
     <PropertyGroup>
       <V1OutDir>$(RepoRoot)bin\1.0.2019.11.12\net6.0\</V1OutDir>
+      <V1Base>$(RepoRoot)PackageBase\1.0.2019.11.12\</V1Base>
       <V1Stage>$(StagingRoot)1.0.2019.11.12\BepInEx\plugins\SuperliminalTools\</V1Stage>
       <V1StageRoot>$(StagingRoot)1.0.2019.11.12\</V1StageRoot>
       <V1Zip>$(ReleaseOut)1.0.2019.11.12.superliminaltools.$(PackageVersion).zip</V1Zip>
     </PropertyGroup>
+    <RemoveDir Directories="$(V1StageRoot)" />
     <MakeDir Directories="$(V1Stage)" />
     <ItemGroup>
+      <_V1Base Include="$(V1Base)**\*" />
       <_V1Artifacts Include="$(V1OutDir)1.0.2019.11.12.superliminaltools.dll" />
       <_V1Artifacts Include="$(V1OutDir)1.0.2019.11.12.superliminaltools.pdb" />
+      <_V1Artifacts Include="$(V1OutDir)MoonSharp.Interpreter.dll" />
+      <_V1Lua Include="$(RepoRoot)Lua\tas\**\*.lua" />
     </ItemGroup>
+    <Copy SourceFiles="@(_V1Base)"
+          DestinationFiles="@(_V1Base->'$(V1StageRoot)%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(_V1Artifacts)"
           DestinationFolder="$(V1Stage)"
           SkipUnchangedFiles="true"
           Condition="'@(_V1Artifacts)' != ''" />
+    <Copy SourceFiles="@(_V1Lua)"
+          DestinationFiles="@(_V1Lua->'$(V1StageRoot)demos\tas\%(RecursiveDir)%(Filename)%(Extension)')" />
     <ZipDirectory SourceDirectory="$(V1StageRoot)"
                   DestinationFile="$(V1Zip)"
                   Overwrite="true" />
@@ -54,19 +63,28 @@
     <!-- Version 1.10.2020.7.6 -->
     <PropertyGroup>
       <V2OutDir>$(RepoRoot)bin\1.10.2020.7.6\net6.0\</V2OutDir>
+      <V2Base>$(RepoRoot)PackageBase\1.10.2020.7.6\</V2Base>
       <V2Stage>$(StagingRoot)1.10.2020.7.6\BepInEx\plugins\SuperliminalTools\</V2Stage>
       <V2StageRoot>$(StagingRoot)1.10.2020.7.6\</V2StageRoot>
       <V2Zip>$(ReleaseOut)1.10.2020.7.6.superliminaltools.$(PackageVersion).zip</V2Zip>
     </PropertyGroup>
+    <RemoveDir Directories="$(V2StageRoot)" />
     <MakeDir Directories="$(V2Stage)" />
     <ItemGroup>
+      <_V2Base Include="$(V2Base)**\*" />
       <_V2Artifacts Include="$(V2OutDir)1.10.2020.7.6.superliminaltools.dll" />
       <_V2Artifacts Include="$(V2OutDir)1.10.2020.7.6.superliminaltools.pdb" />
+      <_V2Artifacts Include="$(V2OutDir)MoonSharp.Interpreter.dll" />
+      <_V2Lua Include="$(RepoRoot)Lua\tas\**\*.lua" />
     </ItemGroup>
+    <Copy SourceFiles="@(_V2Base)"
+          DestinationFiles="@(_V2Base->'$(V2StageRoot)%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(_V2Artifacts)"
           DestinationFolder="$(V2Stage)"
           SkipUnchangedFiles="true"
           Condition="'@(_V2Artifacts)' != ''" />
+    <Copy SourceFiles="@(_V2Lua)"
+          DestinationFiles="@(_V2Lua->'$(V2StageRoot)demos\tas\%(RecursiveDir)%(Filename)%(Extension)')" />
     <ZipDirectory SourceDirectory="$(V2StageRoot)"
                   DestinationFile="$(V2Zip)"
                   Overwrite="true" />
@@ -83,19 +101,28 @@
     <!-- Version 1.10.2020.12.10 -->
     <PropertyGroup>
       <V3OutDir>$(RepoRoot)bin\1.10.2020.12.10\netstandard2.0\</V3OutDir>
+      <V3Base>$(RepoRoot)PackageBase\1.10.2020.12.10\</V3Base>
       <V3Stage>$(StagingRoot)1.10.2020.12.10\BepInEx\plugins\SuperliminalTools\</V3Stage>
       <V3StageRoot>$(StagingRoot)1.10.2020.12.10\</V3StageRoot>
       <V3Zip>$(ReleaseOut)1.10.2020.12.10.superliminaltools.$(PackageVersion).zip</V3Zip>
     </PropertyGroup>
+    <RemoveDir Directories="$(V3StageRoot)" />
     <MakeDir Directories="$(V3Stage)" />
     <ItemGroup>
+      <_V3Base Include="$(V3Base)**\*" />
       <_V3Artifacts Include="$(V3OutDir)1.10.2020.12.10.superliminaltools.dll" />
       <_V3Artifacts Include="$(V3OutDir)1.10.2020.12.10.superliminaltools.pdb" />
+      <_V3Artifacts Include="$(V3OutDir)MoonSharp.Interpreter.dll" />
+      <_V3Lua Include="$(RepoRoot)Lua\tas\**\*.lua" />
     </ItemGroup>
+    <Copy SourceFiles="@(_V3Base)"
+          DestinationFiles="@(_V3Base->'$(V3StageRoot)%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(_V3Artifacts)"
           DestinationFolder="$(V3Stage)"
           SkipUnchangedFiles="true"
           Condition="'@(_V3Artifacts)' != ''" />
+    <Copy SourceFiles="@(_V3Lua)"
+          DestinationFiles="@(_V3Lua->'$(V3StageRoot)demos\tas\%(RecursiveDir)%(Filename)%(Extension)')" />
     <ZipDirectory SourceDirectory="$(V3StageRoot)"
                   DestinationFile="$(V3Zip)"
                   Overwrite="true" />
@@ -103,19 +130,28 @@
     <!-- Version 1.10.2023.2.17 -->
     <PropertyGroup>
       <V4OutDir>$(RepoRoot)bin\1.10.2023.2.17\netstandard2.0\</V4OutDir>
+      <V4Base>$(RepoRoot)PackageBase\1.10.2023.2.17\</V4Base>
       <V4Stage>$(StagingRoot)1.10.2023.2.17\BepInEx\plugins\SuperliminalTools\</V4Stage>
       <V4StageRoot>$(StagingRoot)1.10.2023.2.17\</V4StageRoot>
       <V4Zip>$(ReleaseOut)1.10.2023.2.17.superliminaltools.$(PackageVersion).zip</V4Zip>
     </PropertyGroup>
+    <RemoveDir Directories="$(V4StageRoot)" />
     <MakeDir Directories="$(V4Stage)" />
     <ItemGroup>
+      <_V4Base Include="$(V4Base)**\*" />
       <_V4Artifacts Include="$(V4OutDir)1.10.2023.2.17.superliminaltools.dll" />
       <_V4Artifacts Include="$(V4OutDir)1.10.2023.2.17.superliminaltools.pdb" />
+      <_V4Artifacts Include="$(V4OutDir)MoonSharp.Interpreter.dll" />
+      <_V4Lua Include="$(RepoRoot)Lua\tas\**\*.lua" />
     </ItemGroup>
+    <Copy SourceFiles="@(_V4Base)"
+          DestinationFiles="@(_V4Base->'$(V4StageRoot)%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(_V4Artifacts)"
           DestinationFolder="$(V4Stage)"
           SkipUnchangedFiles="true"
           Condition="'@(_V4Artifacts)' != ''" />
+    <Copy SourceFiles="@(_V4Lua)"
+          DestinationFiles="@(_V4Lua->'$(V4StageRoot)demos\tas\%(RecursiveDir)%(Filename)%(Extension)')" />
     <ZipDirectory SourceDirectory="$(V4StageRoot)"
                   DestinationFile="$(V4Zip)"
                   Overwrite="true" />

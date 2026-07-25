@@ -4,6 +4,7 @@
     <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
 
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CopyLocalLockFileAssemblies Condition="'$(Configuration)' == 'Release'">true</CopyLocalLockFileAssemblies>
     <LangVersion>latest</LangVersion>
     <RootNamespace>SuperliminalTools</RootNamespace>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
