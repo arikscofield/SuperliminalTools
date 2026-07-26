@@ -19,6 +19,12 @@ public sealed class GameState
 
     private static GameObject Player => GameManager.GM != null ? GameManager.GM.player : null;
     private static Camera Cam => GameManager.GM != null ? GameManager.GM.playerCamera : null;
+    
+    private static CharacterMotor Motor => Player != null ? Player.GetComponent<CharacterMotor>() : null;
+    
+    private static ResizeScript RS => Cam != null ? Cam.GetComponent<ResizeScript>() : null;
+    
+    private double _aimLead;
 
     // ---- simple scalars -------------------------------------------------
 
@@ -29,11 +35,40 @@ public sealed class GameState
         var motor = p.GetComponent<CharacterMotor>();
         return motor != null && motor.grounded;
     }
+    
+    //Seconds left on the jump cooldown (CharacterMotor.timeOnGroundBeforeCanJump)
+    public double jump_cooldown()
+    {
+        var m = Motor;
+        return m != null ? Mathf.Max(0f, m.timeOnGroundBeforeCanJump) : 0.0;
+    }
+
+    // Frames left on the cooldown at the fixed timestep
+    public int jump_cooldown_frames()
+        => Mathf.CeilToInt((float)jump_cooldown() / Time.fixedDeltaTime);
+    
+    // True when a Jump press will actually produce upward velocity
+    public bool can_jump()
+    {
+        var m = Motor;
+        return m != null && m.grounded && m.jumping.enabled && m.timeOnGroundBeforeCanJump <= 0f;
+    }
 
     public bool is_grabbing()
     {
         var rs = Cam != null ? Cam.GetComponent<ResizeScript>() : null;
         return rs != null && rs.isGrabbing;
+    }
+    
+    private static GameObject Grabbed()
+    {
+        var rs = RS;
+        if (rs == null || !rs.isGrabbing) return null;
+#if LEGACY
+        return rs.grabbedObject;
+#else
+        return rs.GetGrabbedObject();
+#endif
     }
 
     public bool is_ready_to_grab()
@@ -41,11 +76,69 @@ public sealed class GameState
         var rs = Cam != null ? Cam.GetComponent<ResizeScript>() : null;
         return rs != null && rs.isReadyToGrab;
     }
+    
+    // True when a spinnable object is in hand (Rotate would spin it)
+    public bool can_spin()
+    {
+        var g = Grabbed();
+        var dts = g != null ? g.GetComponent<DropTriggerScript>() : null;
+        return dts != null && dts.grabValues != null && dts.grabValues.canSpin;
+    }
+    
+    /// <summary>
+    /// Degrees of world-up spin the held object gets per 1.0 of Look Horizontal, for a
+    /// frame like the last one. Folds in the invert pref, the camera pitch term, the
+    /// y-axis-only special case and Time.deltaTime, so Lua turns a wanted angle into a
+    /// look delta with one divide. 0 when nothing spinnable is held.
+    /// Sign note: positive spin (yaw increasing) comes from NEGATIVE Look Horizontal.
+    /// </summary>
+    public double spin_scale()
+    {
+        var g = Grabbed();
+        var dts = g != null ? g.GetComponent<DropTriggerScript>() : null;
+        if (dts == null || dts.grabValues == null || !dts.grabValues.canSpin) return 0.0;
+
+        float invX = 1f;
+#if HAS_INVERT_MULTIPLIER
+        invX = InvertAxis.GetInvertXAxisMultiplier();
+#endif
+
+        float dt = Time.deltaTime;
+        if (dts.optionalSpinYAxisOnly) return -invX * 150f * dt;
+        var c = Cam;
+        float cosPitch = c != null ? c.transform.up.y : 1f;   // camera.TransformDirection(0,-h,0).y
+        return -invX * 100f * dt * cosPitch;
+    }
+    
+    // World-Y euler of the held object
+    // Returns -999 when nothing is held. Wraps at 360
+    public double grabbed_yaw()
+    {
+        var g = Grabbed();
+        return g != null ? g.transform.eulerAngles.y : -999.0;
+    }
+
+    public string grabbed_name()
+    {
+        var g = Grabbed();
+        return g != null ? g.name : "";
+    }
 
     public int checkpoint_index()
     {
         return DemoRecorder.Instance != null ? DemoRecorder.Instance.CurrentCheckpointIndex() : -1;
     }
+    
+    // Instantly move the player to a checkpoint (no reload).
+    // lands at the end of the frame it's requested on
+    public void warp_to_checkpoint(int index)
+    {
+        if (DemoRecorder.Instance != null) DemoRecorder.Instance.RequestCheckpointWarp(index);
+    }
+
+    // How many checkpoints this level has
+    public int checkpoint_count()
+        => Object.FindObjectsOfType<CheckPoint>().Length;
 
     // ---- vectors (returned as multiple Lua values: x, y, z) -------------
 
@@ -109,6 +202,45 @@ public sealed class GameState
         #endif
         return DynValue.NewTuple(DynValue.NewNumber(sx), DynValue.NewNumber(sy));
     }
+    
+    
+    /// <summary>
+    /// Local move axes (x = strafe, y = forward) that produce world heading `yaw`
+    /// at `speed` fraction of max. Inverts the exact transform FPSInputController
+    /// applies (player rotation, not camera) and pre-compensates its magnitude
+    /// squaring, so no angle bookkeeping is left in Lua to get wrong.
+    /// <summary>
+    public DynValue move_axes_for(double yaw, double speed)
+    {
+        var p = Player;
+        if (p == null) return Err(0, 0);
+
+        Vector3 world = DirFromAngles((float)yaw, 0f);
+        Vector3 local = Quaternion.Inverse(p.transform.rotation) * world;
+        local.y = 0f;
+        local = local.normalized;
+
+        float m = Mathf.Sqrt(Mathf.Clamp01((float)speed));
+        return Err(local.x * m, local.z * m);
+    }
+
+    //Player transform yaw - the rotaiton movement is actually built from
+    public double player_yaw()
+    {
+        var p = Player;
+        return p != null ? YawOf(p.transform.forward) : 0.0;
+    }
+
+    // World heading we're actually travelling, or -999 if stopped
+    public double travel_yaw()
+    {
+        var p = Player;
+        var cc = p != null ? p.GetComponent<CharacterController>() : null;
+        if (cc == null) return -999.0;
+        var v = cc.velocity;
+        if (v.x * v.x + v.z * v.z < 0.01f) return -999.0;
+        return YawOf(new Vector3(v.x, 0f, v.z));
+    }
 
     // ---- target selection ----------------------------------------------
     
@@ -150,31 +282,39 @@ public sealed class GameState
     }
 
     /// <summary>
-    /// Nearest GRABBABLE object (has a DropTriggerScript — the game's own grab
-    /// marker; these sit on the "CanGrab" layer), optionally filtered by a
-    /// case-insensitive name substring. Returns a handle (>= 0) or -1.
+    /// The `index`-th nearest GRABBABLE object (1 = nearest), optionally filtered
+    /// by name. The filter is a case-insensitive substring, or an exact name if
+    /// you prefix it with '='
+    /// Returns a handle (>= 0) or -1.
     /// </summary>
-    public int nearest(string nameFilter = null)
+    public int nearest(string nameFilter = null, int index = 1)
     {
         var p = Player;
-        if (p == null) return -1;
+        if (p == null || index < 1) return -1;
         var origin = p.transform.position;
 
-        Transform best = null;
-        float bestSq = float.MaxValue;
         bool wildcard = string.IsNullOrEmpty(nameFilter) || nameFilter == "*";
-        string needle = wildcard ? null : nameFilter.ToLowerInvariant();
+        bool exact = !wildcard && nameFilter[0] == '=';
+        string needle = wildcard ? null
+            : (exact ? nameFilter.Substring(1) : nameFilter.ToLowerInvariant());
 
+        var matches = new List<Transform>();
         foreach (var dt in Object.FindObjectsOfType<DropTriggerScript>())
         {
             var t = dt.transform;
-            if (!wildcard && !t.name.ToLowerInvariant().Contains(needle)) continue;
-            float sq = (AimCenter(t) - origin).sqrMagnitude;
-            if (sq < bestSq) { bestSq = sq; best = t; }
+            if (!wildcard)
+            {
+                if (exact) { if (t.name != needle) continue; }
+                else if (!t.name.ToLowerInvariant().Contains(needle)) continue;
+            }
+            matches.Add(t);
         }
 
-        if (best == null) return -1;
-        _targets.Add(best);
+        if (matches.Count < index) return -1;
+        matches.Sort((a, b) => (AimCenter(a) - origin).sqrMagnitude
+            .CompareTo((AimCenter(b) - origin).sqrMagnitude));
+
+        _targets.Add(matches[index - 1]);
         return _targets.Count - 1;
     }
 
@@ -197,6 +337,22 @@ public sealed class GameState
     // Positive pitch_err = target is above where you're looking.
     // How those map to Look axis signs is game-defined, so the Lua control
     // loop has yaw_sign / pitch_sign knobs — flip them if aiming diverges.
+    
+    public void set_aim_lead(double frames) { _aimLead = frames; }
+
+    private Vector3 Eye()
+    {
+        var c = Cam;
+        if (c == null) return Vector3.zero;
+        var eye = c.transform.position;
+        if (_aimLead != 0.0)
+        {
+            var p = Player;
+            var cc = p != null ? p.GetComponent<CharacterController>() : null;
+            if (cc != null) eye += cc.velocity * (float)(_aimLead * Time.fixedDeltaTime);
+        }
+        return eye;
+    }
 
     public DynValue aim_error(int handle)
     {
@@ -211,7 +367,8 @@ public sealed class GameState
     /// <summary>Error toward an absolute world direction given as yaw, pitch (degrees).</summary>
     public DynValue aim_error_dir(double yaw, double pitch)
     {
-        var eye = Cam != null ? Cam.transform.position : Vector3.zero;
+        // var eye = Cam != null ? Cam.transform.position : Vector3.zero;
+        var eye = Eye();
         return AimErrorToPoint(eye + DirFromAngles((float)yaw, (float)pitch) * 1000f);
     }
 
@@ -235,7 +392,8 @@ public sealed class GameState
 
     private DynValue AimErrorToPoint(Vector3 point)
     {
-        var eye = Cam != null ? Cam.transform.position : Vector3.zero;
+        // var eye = Cam != null ? Cam.transform.position : Vector3.zero;
+        var eye = Eye();
         Vector3 dir = point - eye;
         if (dir.sqrMagnitude < 1e-6f) return Err(0, 0);
 

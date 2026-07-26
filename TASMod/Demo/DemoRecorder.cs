@@ -46,6 +46,7 @@ public sealed class DemoRecorder : MonoBehaviour
     private bool _resetting;
     private bool _lastUpdateWasFixed;
     private bool _needsCheckpointReset;
+    private int _pendingCheckpointWarp = -1;
 
     // Available playback speeds in FPS (base game is 50 FPS)
     private static readonly int[] PlaybackSpeeds = { 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000 };
@@ -61,6 +62,10 @@ public sealed class DemoRecorder : MonoBehaviour
     private DemoFileDialog _fileDialog;
     private string _lastOpenedFile;
     private DateTime _lastFileWriteTime;
+    
+    /// <summary>Queue an instant warp to a checkpoint index -- transform move only,
+    /// no scene reload. Applied at the end of the current frame, like the reset.</summary>
+    public void RequestCheckpointWarp(int index) => _pendingCheckpointWarp = index;
 
     private void Awake()
     {
@@ -160,6 +165,13 @@ public sealed class DemoRecorder : MonoBehaviour
         {
             _needsCheckpointReset = false;
             ResetToCheckpoint();
+        }
+        
+        if (_pendingCheckpointWarp >= 0)
+        {
+            var idx = _pendingCheckpointWarp;
+            _pendingCheckpointWarp = -1;
+            TeleportToCheckpoint(idx);
         }
     }
 

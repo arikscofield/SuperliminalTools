@@ -14,6 +14,10 @@ Frame.BUTTONS = { "Jump", "Grab", "Rotate" }
 Frame.RESET = "Reset Checkpoint"
 Frame.SPEED = "Speed"
 
+Frame.FIXED_DT = 0.02
+Frame.SPIN_RATE = 100 * Frame.FIXED_DT
+Frame.SPIN_RATE_Y_ONLY = 150 * Frame.FIXED_DT
+
 -- Define the columsn headers
 Frame.COLUMNS = {}
 for _, name in ipairs(Frame.AXES) do

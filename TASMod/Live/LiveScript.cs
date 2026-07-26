@@ -53,6 +53,7 @@ public sealed class LiveScript
         foreach (var b in ButtonNames) { _cur[b] = false; _prev[b] = false; }
         
         _script = new Script(CoreModules.Preset_SoftSandbox);
+        _script.Options.DebugPrint = s => Debug.Log("[TAS] " + s);
         _script.Globals["__tas_live"] = true;
         _script.Globals["__tas_game"] = UserData.Create(_game);
 
