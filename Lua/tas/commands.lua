@@ -479,6 +479,25 @@ function Commands.build(sink, game)
             "speed()/reset_checkpoint() was called but no frame followed it")
         return sink:save(path)
     end
+	
+	-- Declare an auto-save target. The host calls __tas_autosave when playback
+    -- ends -- script finished, level finished, or a manual stop. That's the only
+    -- way to catch level end: the coroutine is never resumed past the scene swap.
+    local auto_path = nil
+
+    function tas.record(path)
+        assert(sink.save, "this sink does not support save()")
+        auto_path = path
+        return tas
+    end
+
+    __tas_autosave = function()
+        local path = auto_path
+        auto_path = nil                       -- one save per run
+        if not path or not sink.save then return end
+        if sink:frame_count() == 0 then return end
+        print("saved " .. sink:save(path))
+    end
     
     
     

@@ -1,7 +1,6 @@
 -- Assembles the tas API over a sink, choosing the backend automatically:
 --   offline (plain `lua run.lua`)      -> CsvSink, no game bridge
 --   in-game (C# set __tas_live = true) -> LiveSink + the `game` bridge
--- The same run.lua works in both.
 
 local CsvSink = require("tas.sink_csv")
 local Commands = require("tas.commands")
@@ -12,7 +11,9 @@ M.CsvSink = CsvSink
 function M.new(sink)
     if not sink then
         if __tas_live then
-            sink = require("tas.sink_live").new()
+            local live = require("tas.sink_live").new()
+			-- route the live-inputs through the recorder so it can be dumped to "offline" raw csv/lua
+			sink = require("tas.sink_record").new(live)
         else
             sink = CsvSink.new()
         end

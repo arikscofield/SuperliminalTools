@@ -57,6 +57,7 @@ public sealed class DemoRecorder : MonoBehaviour
 
     private Live.LiveScript _live;
     private int _liveProducedFrame = -1;
+    private string _liveLevel;
 
     private DemoData _data;
     private DemoFileDialog _fileDialog;
@@ -351,8 +352,10 @@ public sealed class DemoRecorder : MonoBehaviour
         _playbackSpeedIndex = 5;
         ApplyPlaybackSpeed();
 
+        if (_live != null) _live.SaveRecording();
         _live = null;
         _liveProducedFrame = -1;
+        _liveLevel = null;
 
         TASInput.disablePause = false;
         TASInput.StopPlayback();
@@ -596,6 +599,7 @@ public sealed class DemoRecorder : MonoBehaviour
             _recording = false;
             _playingBack = true;
             _demoStartFrame = Time.renderedFrameCount;
+            _liveLevel = SceneManager.GetActiveScene().name;
 
             TASInput.disablePause = true;
             TASInput.StartPlayback(this);
@@ -811,7 +815,12 @@ public sealed class DemoRecorder : MonoBehaviour
 
     private void OnLoadSetup(Scene scene, LoadSceneMode mode)
     {
-        if (!String.IsNullOrEmpty(_data.LevelId) && scene.name != _data.LevelId)
+        if (_playingBack && _live != null && !String.IsNullOrEmpty(_liveLevel) && scene.name != _liveLevel)
+        {
+            Debug.Log("Level finished on frame " + CurrentFrame + "; ending live run.");
+            StopPlayback();
+        }
+        else if (!String.IsNullOrEmpty(_data.LevelId) && scene.name != _data.LevelId)
         {
             if (_playingBack)
             {

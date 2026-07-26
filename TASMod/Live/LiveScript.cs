@@ -56,6 +56,14 @@ public sealed class LiveScript
         _script.Options.DebugPrint = s => Debug.Log("[TAS] " + s);
         _script.Globals["__tas_live"] = true;
         _script.Globals["__tas_game"] = UserData.Create(_game);
+        _script.Globals["__tas_write"] = DynValue.NewCallback((ctx, args) =>
+        {
+            var path = args[0].CastToString();
+            var full = Path.IsPathRooted(path) ? path : Path.Combine(scriptsRoot, path);
+            File.WriteAllText(full, args[1].CastToString());
+            Debug.Log("[TAS] wrote " + full);
+            return DynValue.NewString(full);
+        });
 
         PreloadTasModules(scriptsRoot);
         _script.DoString(RequireBootstrap);
@@ -85,6 +93,18 @@ public sealed class LiveScript
             modules.Set(modName, chunk);
         }
         _script.Globals["__modules"] = modules;
+    }
+    
+    /// <summary>
+    /// Runs the script's __tas_autosave hook if it registered one (tas.record).
+    /// Safe to call while the coroutine is suspended -- this is a separate call.
+    /// </summary>
+    public void SaveRecording()
+    {
+        var fn = _script.Globals.Get("__tas_autosave");
+        if (fn.IsNil()) return;
+        try { _script.Call(fn); }
+        catch (Exception e) { Debug.LogError("[TAS] autosave failed: " + e.Message); }
     }
 
     /// <summary>Resume the script for exactly one frame of output.</summary>
