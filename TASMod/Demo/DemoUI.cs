@@ -4,7 +4,6 @@ using System.Linq;
 
 namespace SuperliminalTools.TASMod.Demo;
 
-#if LEGACY
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -20,40 +19,22 @@ public readonly struct ExtensionFilter
         Extensions = extensions ?? Array.Empty<string>();
     }
 }
-#else
-using SFB;
-#endif
 
 public sealed class DemoFileDialog
 {
-#if !LEGACY
-    private readonly StandaloneFileBrowserWindows _fileBrowser = new();
-#endif
 
     private static readonly ExtensionFilter[] OpenExtensionList =
     {
-#if LEGACY
         new("Demos & Scripts (*.csv, *.lua)", "csv", "lua"),
         new("CSV File (*.csv)", "csv"),
         new("Lua Script (*.lua)", "lua"),
         new("All Files (*.*)", "*")
-#else
-        new("Demos & Scripts (*.csv, *.lua)", "csv", "lua"),
-        new("CSV File (*.csv)", "csv"),
-        new("Lua Script (*.lua)", "lua"),
-        new("All Files", "*")
-#endif
     };
 
     private static readonly ExtensionFilter[] SaveExtensionList =
     {
-#if LEGACY
         new("CSV File (*.csv)", "csv"),
         new("All Files (*.*)", "*")
-#else
-        new("CSV File (*.csv)", "csv"),
-        new("All Files", "*")
-#endif
     };
 
     public string DemoDirectory { get; }
@@ -67,23 +48,17 @@ public sealed class DemoFileDialog
 
     public string OpenPath()
     {
-#if LEGACY
         return Win32FileDialogs.OpenFile(
             title: "Open TAS File",
             initialDirectory: DemoDirectory,
             filters: OpenExtensionList,
             defaultExtension: "csv"
         );
-#else
-        var selected = _fileBrowser.OpenFilePanel("Open TAS File", DemoDirectory, OpenExtensionList, false);
-        return selected.FirstOrDefault()?.Name;
-#endif
     }
 
     public string SavePath()
     {
         var name = $"SuperliminalTAS-{DateTime.Now:yyyy-MM-dd-HH-mm-ss}.csv";
-#if LEGACY
         return Win32FileDialogs.SaveFile(
             title: "Save Recording as",
             initialDirectory: DemoDirectory,
@@ -91,14 +66,9 @@ public sealed class DemoFileDialog
             filters: SaveExtensionList,
             defaultExtension: "csv"
         );
-#else
-        var selected = _fileBrowser.SaveFilePanel("Save Recording as", DemoDirectory, name, SaveExtensionList);
-        return selected?.Name;
-#endif
     }
 }
 
-#if LEGACY
 internal static class Win32FileDialogs
 {
     // --- Public API ---
@@ -293,4 +263,3 @@ internal static class Win32FileDialogs
         return new string(chars);
     }
 }
-#endif

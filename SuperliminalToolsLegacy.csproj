@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -11,7 +11,27 @@
 
     <DefineConstants>$(DefineConstants);LEGACY</DefineConstants>
     <DefineConstants Condition="'$(GameVersion)' == '1.10.2020.7.6'">$(DefineConstants);HAS_LEVELINFO;HAS_VO_PLAYER</DefineConstants>
+
+    <!-- Build with the DebugProbes configuration (or /p:DebugProbes=true) to include
+         PhysicsProbe (F9), DesyncLog and the determinism hit dump (F8). Off by
+         default so releases ship no debug hotkeys. -->
+    <Configurations>Debug;Release;DebugProbes</Configurations>
+    <DebugProbes Condition="'$(Configuration)' == 'DebugProbes'">true</DebugProbes>
+    <DebugProbes Condition="'$(DebugProbes)' == ''">false</DebugProbes>
+    <DefineConstants Condition="'$(DebugProbes)' == 'true'">$(DefineConstants);DEBUG_PROBES</DefineConstants>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'DebugProbes'">
+    <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
+    <Optimize>false</Optimize>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <!-- Per-version list of approximate-reciprocal sites in UnityPlayer.dll,
+       embedded so the shipped plugin carries no loose data files. -->
+  <ItemGroup>
+    <EmbeddedResource Include="CPUDeterminism\Sites\rsqrt_sites_$(GameVersion).txt" LogicalName="rsqrt_sites.txt" />
+  </ItemGroup>
 
   <ItemGroup>
 	  <PackageReference Include="MoonSharp" Version="2.0.0" />

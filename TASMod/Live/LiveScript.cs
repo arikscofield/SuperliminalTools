@@ -106,6 +106,23 @@ public sealed class LiveScript
         try { _script.Call(fn); }
         catch (Exception e) { Debug.LogError("[TAS] autosave failed: " + e.Message); }
     }
+    
+    /// <summary>
+    /// The level a live script targets, read straight out of its tas.level("...") declaration.
+    /// Null if the script doesn't declare one.
+    /// The level must be a literal, not a variable.
+    /// </summary>
+    public static string DeclaredLevel(string scriptPath)
+    {
+        try
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(
+                File.ReadAllText(scriptPath),
+                @"(?m)^[^-\r\n]*\.level\s*\(\s*[""']([^""']+)[""']");
+            return m.Success ? m.Groups[1].Value : null;
+        }
+        catch { return null; }
+    }
 
     /// <summary>Resume the script for exactly one frame of output.</summary>
     public void Advance()

@@ -126,6 +126,10 @@ public sealed class DemoRecorder : MonoBehaviour
         }
         else if (_playingBack)
         {
+#if DEBUG_PROBES
+            DesyncLog.Frame(CurrentFrame);
+#endif
+            
             EnsureLiveAdvanced();
 
             if (_live != null)
@@ -180,6 +184,10 @@ public sealed class DemoRecorder : MonoBehaviour
 
     private void HandleHotkeys()
     {
+#if DEBUG_PROBES
+        if (Input.GetKeyDown(KeyCode.F8)) SuperliminalToolsPlugin.DumpDeterminismHits();
+#endif
+
         if (_recording)
         {
             if (Input.GetKeyDown(KeyCode.F5)) StopRecording();
@@ -194,6 +202,11 @@ public sealed class DemoRecorder : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.F5)) StartPlayback();
             else if (Input.GetKeyDown(KeyCode.F6)) StartRecording();
             else if (Input.GetKeyDown(KeyCode.F7)) StartRecordingFromCheckpoint();
+
+
+#if DEBUG_PROBES
+            if (Input.GetKeyDown(KeyCode.F9)) PhysicsProbe.Run();
+#endif
 
             if (Input.GetKeyDown(KeyCode.F12))
             {
@@ -310,6 +323,10 @@ public sealed class DemoRecorder : MonoBehaviour
     {
         if (_recording || _playingBack || _resetting) return;
 
+#if DEBUG_PROBES
+        DesyncLog.Start("run");
+#endif
+
         if (IsLiveScript(_lastOpenedFile))
         {
             StartLivePlayback(_lastOpenedFile);
@@ -346,6 +363,10 @@ public sealed class DemoRecorder : MonoBehaviour
 
     private void StopPlayback()
     {
+#if DEBUG_PROBES
+        DesyncLog.Stop();
+#endif
+        
         _recording = false;
         _playingBack = false;
 
@@ -581,13 +602,35 @@ public sealed class DemoRecorder : MonoBehaviour
     {
         _lastOpenedFile = path;
         _lastFileWriteTime = File.GetLastWriteTime(path);
-        Debug.Log($"Loaded live script: {path} (press F5 to run). Be on the target level first.");
+        var level = Live.LiveScript.DeclaredLevel(path);
+        Debug.Log($"Loaded live script: {path} (press F5 to run)" +
+                  (string.IsNullOrEmpty(level) ? " -- no tas.level() declared, be on the target level first."
+                      : $", level {level}"));
+
+        if (!string.IsNullOrEmpty(level) && SceneManager.GetActiveScene().name != level)
+        {
+#if !LEGACY
+            GameManager.GM.TriggerScenePreUnload();
+#endif
+            SceneManager.LoadScene(level);
+        }
     }
 
     public void StartLivePlayback(string scriptPath)
     {
         if (_recording || _playingBack || _resetting) return;
 
+        var level = Live.LiveScript.DeclaredLevel(scriptPath);
+        if (!string.IsNullOrEmpty(level) && SceneManager.GetActiveScene().name != level)
+        {
+            Debug.Log($"Script Level: {level}");
+#if !LEGACY
+            GameManager.GM.TriggerScenePreUnload();
+#endif
+            SceneManager.LoadScene(level);
+            return;
+        }
+        
         Live.LiveScript live;
         try { live = new Live.LiveScript(scriptPath, Path.GetDirectoryName(scriptPath)); }
         catch (Exception e) { Debug.LogError($"Failed to load live script: {e}"); return; }
@@ -711,7 +754,6 @@ public sealed class DemoRecorder : MonoBehaviour
             // Manual bubble sort - IL2CPP compatible
             for (int i = 0; i < array.Length - 1; i++)
             {
-                Debug.Log(array[i].transform.name);
                 for (int j = i + 1; j < array.Length; j++)
                 {
                     int iOrder = roomOrder.GetRoomIndex(array[i].transform.parent);

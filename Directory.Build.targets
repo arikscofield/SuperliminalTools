@@ -46,6 +46,7 @@
       <_V1Artifacts Include="$(V1OutDir)1.0.2019.11.12.superliminaltools.dll" />
       <_V1Artifacts Include="$(V1OutDir)1.0.2019.11.12.superliminaltools.pdb" />
       <_V1Artifacts Include="$(V1OutDir)MoonSharp.Interpreter.dll" />
+      <_V1Artifacts Include="$(RepoRoot)CPUDeterminism\SuperliminalDeterminism.dll" />
       <_V1Lua Include="$(RepoRoot)Lua\tas\**\*.lua" />
     </ItemGroup>
     <Copy SourceFiles="@(_V1Base)"
@@ -75,6 +76,7 @@
       <_V2Artifacts Include="$(V2OutDir)1.10.2020.7.6.superliminaltools.dll" />
       <_V2Artifacts Include="$(V2OutDir)1.10.2020.7.6.superliminaltools.pdb" />
       <_V2Artifacts Include="$(V2OutDir)MoonSharp.Interpreter.dll" />
+      <_V2Artifacts Include="$(RepoRoot)CPUDeterminism\SuperliminalDeterminism.dll" />
       <_V2Lua Include="$(RepoRoot)Lua\tas\**\*.lua" />
     </ItemGroup>
     <Copy SourceFiles="@(_V2Base)"
@@ -113,6 +115,7 @@
       <_V3Artifacts Include="$(V3OutDir)1.10.2020.12.10.superliminaltools.dll" />
       <_V3Artifacts Include="$(V3OutDir)1.10.2020.12.10.superliminaltools.pdb" />
       <_V3Artifacts Include="$(V3OutDir)MoonSharp.Interpreter.dll" />
+      <_V3Artifacts Include="$(RepoRoot)CPUDeterminism\SuperliminalDeterminism.dll" />
       <_V3Lua Include="$(RepoRoot)Lua\tas\**\*.lua" />
     </ItemGroup>
     <Copy SourceFiles="@(_V3Base)"
@@ -142,6 +145,7 @@
       <_V4Artifacts Include="$(V4OutDir)1.10.2023.2.17.superliminaltools.dll" />
       <_V4Artifacts Include="$(V4OutDir)1.10.2023.2.17.superliminaltools.pdb" />
       <_V4Artifacts Include="$(V4OutDir)MoonSharp.Interpreter.dll" />
+      <_V4Artifacts Include="$(RepoRoot)CPUDeterminism\SuperliminalDeterminism.dll" />
       <_V4Lua Include="$(RepoRoot)Lua\tas\**\*.lua" />
     </ItemGroup>
     <Copy SourceFiles="@(_V4Base)"

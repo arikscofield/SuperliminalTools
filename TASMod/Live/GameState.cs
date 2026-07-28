@@ -375,7 +375,14 @@ public sealed class GameState
     // ---- helpers --------------------------------------------------------
 
     private Transform Resolve(int handle)
-        => handle >= 0 && handle < _targets.Count ? _targets[handle] : null;
+    {
+        if (handle < 0 || handle >= _targets.Count)
+            throw new ScriptRuntimeException($"no such target handle: {handle}");
+        var t = _targets[handle];
+        if (t == null)
+            throw  new ScriptRuntimeException($"target handle {handle} no longer exists");
+        return t;
+    }
 
     private static DynValue Vec(Vector3 v) => DynValue.NewTuple(
         DynValue.NewNumber(v.x), DynValue.NewNumber(v.y), DynValue.NewNumber(v.z));

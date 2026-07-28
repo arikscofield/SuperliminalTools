@@ -1,0 +1,6 @@
+# MSVC build intermediates (build.cmd removes these, but just in case)
+*.obj
+*.exp
+*.lib
+*.pdb
+*.ilk
