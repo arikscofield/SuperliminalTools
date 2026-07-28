@@ -631,8 +631,16 @@ public sealed class DemoRecorder : MonoBehaviour
             return;
         }
         
+        var modulesRoot = Live.LiveScript.ResolveModulesRoot(scriptPath, _fileDialog.DemoDirectory);
+        if (modulesRoot == null)
+        {
+            Debug.LogError($"Can't run {scriptPath}: no tas/ module folder found next to it, " +
+                           $"in any parent folder, or in {_fileDialog.DemoDirectory}.");
+            return;
+        }
+
         Live.LiveScript live;
-        try { live = new Live.LiveScript(scriptPath, Path.GetDirectoryName(scriptPath)); }
+        try { live = new Live.LiveScript(scriptPath, modulesRoot); }
         catch (Exception e) { Debug.LogError($"Failed to load live script: {e}"); return; }
 
         StartCoroutine(ResetLevelStateThen(() =>

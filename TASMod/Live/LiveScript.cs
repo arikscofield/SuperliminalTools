@@ -52,6 +52,8 @@ public sealed class LiveScript
         foreach (var a in AxisNames) _axis[a] = 0f;
         foreach (var b in ButtonNames) { _cur[b] = false; _prev[b] = false; }
         
+        var scriptDir = Path.GetDirectoryName(Path.GetFullPath(scriptPath));
+        
         _script = new Script(CoreModules.Preset_SoftSandbox);
         _script.Options.DebugPrint = s => Debug.Log("[TAS] " + s);
         _script.Globals["__tas_live"] = true;
@@ -59,7 +61,9 @@ public sealed class LiveScript
         _script.Globals["__tas_write"] = DynValue.NewCallback((ctx, args) =>
         {
             var path = args[0].CastToString();
-            var full = Path.IsPathRooted(path) ? path : Path.Combine(scriptsRoot, path);
+            var full = Path.IsPathRooted(path) ? path : Path.Combine(scriptDir, path);
+            var dir = Path.GetDirectoryName(full);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
             File.WriteAllText(full, args[1].CastToString());
             Debug.Log("[TAS] wrote " + full);
             return DynValue.NewString(full);
@@ -72,6 +76,28 @@ public sealed class LiveScript
         var fn = _script.LoadString(code, null, Path.GetFileName(scriptPath));
         _co = _script.CreateCoroutine(fn);
     }
+    
+    /// <summary>
+    /// Locates the folder holding the tas/ module library for a user script:
+    /// the nearest ancestor directory of the script that contains a tas/ folder,
+    /// otherwise the install's demos/ folder. Returns null if neither exists.
+    /// This is what lets scripts live in demos/ subfolders or anywhere on disk.
+    /// </summary>
+    public static string ResolveModulesRoot(string scriptPath, string fallbackRoot)
+    {
+        var dir = Path.GetDirectoryName(Path.GetFullPath(scriptPath));
+        while (!string.IsNullOrEmpty(dir))
+        {
+            if (Directory.Exists(Path.Combine(dir, "tas")))
+                return dir;
+            dir = Path.GetDirectoryName(dir);
+        }
+
+        if (!string.IsNullOrEmpty(fallbackRoot) && Directory.Exists(Path.Combine(fallbackRoot, "tas")))
+            return fallbackRoot;
+
+        return null;
+    }
 
     /// <summary>
     /// Compiles every tas/*.lua into a module chunk and registers it under its
@@ -82,7 +108,9 @@ public sealed class LiveScript
     {
         var tasDir = Path.Combine(scriptsRoot, "tas");
         if (!Directory.Exists(tasDir))
-            throw new FileNotFoundException($"tas module folder not found next to the script: {tasDir}");
+            throw new FileNotFoundException(
+                $"tas module folder not found: {tasDir}. Put the tas/ library in demos/ " +
+                "or in any parent folder of your script.");
 
         var modules = new Table(_script);
         foreach (var file in Directory.GetFiles(tasDir, "*.lua"))
