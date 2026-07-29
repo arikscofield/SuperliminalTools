@@ -355,6 +355,45 @@ function Commands.build(sink, game)
     end
 	
 	
+	-------------- absolute world movement
+	
+	-- Move along an absolute WORLD direction for `frames` frames, regardless of
+    -- where you're looking. Same angle convention as look(): 0 = +Z, 90 = +X.
+    -- speed is linear 0..1. Recomputed every frame, so it stays true even while
+    -- the camera is turning.
+    function tas.move_world(yaw, speed, frames)
+        need_game()
+        frames = frames or 1
+        assert(frames >= 0, "move_world: frames must not be negative")
+        for _ = 1, frames do
+            local mh, mv = game.move_axes_for(yaw or 0, speed or 1)
+            emit(1, { ["Move Horizontal"] = mh, ["Move Vertical"] = mv })
+        end
+        return tas
+    end
+
+    -- Same, but the direction is whatever you're facing at the moment of the
+    -- call -- i.e. "run straight ahead for N frames, then look wherever".
+    function tas.move_forward_world(speed, frames)
+        need_game()
+        return tas.move_world(game.facing(), speed, frames)
+    end
+
+    -- Walk toward a world point for at most `frames` frames, re-aiming every
+    -- frame; stops early once within `tol` metres. y is ignored.
+    function tas.move_to_point(x, z, speed, frames, tol)
+        need_game()
+        frames = frames or 1
+        tol = tol or 0.25
+        for _ = 1, frames do
+            local yaw = yaw_toward(x, z, tol)
+            if not yaw then return tas end
+            local mh, mv = game.move_axes_for(yaw, speed or 1)
+            emit(1, { ["Move Horizontal"] = mh, ["Move Vertical"] = mv })
+        end
+        return tas
+    end
+	
 	---------------- Held / Sticky movement keys 
 
     -- Sticky set raw axis movement
