@@ -177,7 +177,7 @@ public class ColliderVisualizer : MonoBehaviour
         {
             color.a = _visualAlpha;
             var mat = Utility.GetTransparentMaterial(color);
-            renderer.material = mat;
+            renderer.sharedMaterial = mat;
         }
     }
 

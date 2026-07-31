@@ -579,19 +579,21 @@ function Commands.build(sink, game)
     end
 
     -- Spin the held object `deg` degrees about world up, over `frames` frames.
-    function tas.spin(deg, frames, opts)
+    function tas.spin(deg, frames, start_latch, end_latch, opts)
         frames = frames or 1
+		if start_latch == nil then start_latch = false end
+		if end_latch == nil then end_latch = false end
         assert(frames >= 1, "spin: frames must be >= 1")
         local per = ((deg or 0) / frames) / spin_rate(opts)
 
         local was_held = held["Rotate"]
         spinning = true
         tas.hold("Rotate")
-        -- emit(1, { ["Look Horizontal"] = 0, ["Look Vertical"] = 0 })   -- latch skipUpdate
+        if start_latch then emit(1, { ["Look Horizontal"] = 0, ["Look Vertical"] = 0 }) end   -- latch skipUpdate
         emit(frames, { ["Look Horizontal"] = per, ["Look Vertical"] = 0 })
          if not was_held then
             tas.release("Rotate")
-            --emit(1, { ["Look Horizontal"] = 0, ["Look Vertical"] = 0 })
+            if end_latch then emit(1, { ["Look Horizontal"] = 0, ["Look Vertical"] = 0 }) end
         end
         spinning = false
         return tas

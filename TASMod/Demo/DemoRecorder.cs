@@ -63,6 +63,7 @@ public sealed class DemoRecorder : MonoBehaviour
     private DemoFileDialog _fileDialog;
     private string _lastOpenedFile;
     private DateTime _lastFileWriteTime;
+    private float _nextFileCheck;
     
     /// <summary>Queue an instant warp to a checkpoint index -- transform move only,
     /// no scene reload. Applied at the end of the current frame, like the reset.</summary>
@@ -74,6 +75,8 @@ public sealed class DemoRecorder : MonoBehaviour
         _data = DemoData.CreateEmpty();
 
         DemoRecorder.Instance = this;
+
+        Bench.ArmFromCommandLine();
 
         Application.targetFrameRate = 50;
 #if LEGACY
@@ -131,6 +134,7 @@ public sealed class DemoRecorder : MonoBehaviour
 #endif
             
             EnsureLiveAdvanced();
+            Bench.Sample();
 
             if (_live != null)
             {
@@ -303,6 +307,7 @@ public sealed class DemoRecorder : MonoBehaviour
     {
         TASInput.disablePause = false;
         _playbackSpeedIndex = 5;
+        _usingCustomSpeed = false;
         ApplyPlaybackSpeed();
         _recording = false;
     }
@@ -358,6 +363,8 @@ public sealed class DemoRecorder : MonoBehaviour
 
             TASInput.disablePause = true;
             TASInput.StartPlayback(this);
+
+            Bench.Begin();
         }));
     }
 
@@ -366,11 +373,16 @@ public sealed class DemoRecorder : MonoBehaviour
 #if DEBUG_PROBES
         DesyncLog.Stop();
 #endif
-        
+
+        // Close the bench run first: it reports CurrentFrame, which the teardown
+        // below is about to make meaningless.
+        bool benchWantsAnotherRun = Bench.EndRun(CurrentFrame);
+
         _recording = false;
         _playingBack = false;
 
         _playbackSpeedIndex = 5;
+        _usingCustomSpeed = false;
         ApplyPlaybackSpeed();
 
         if (_live != null) _live.SaveRecording();
@@ -380,6 +392,48 @@ public sealed class DemoRecorder : MonoBehaviour
 
         TASInput.disablePause = false;
         TASInput.StopPlayback();
+
+        if (benchWantsAnotherRun) StartCoroutine(BenchNextRun());
+        else Bench.Summary();
+    }
+
+    /// <summary>
+    /// Re-runs the demo for the next --bench iteration. A run that completes the
+    /// level leaves us in the next scene, so get back to the demo's level first.
+    /// </summary>
+#if LEGACY
+    [HideFromIl2Cpp]
+#endif
+    private IEnumerator BenchNextRun()
+    {
+        var target = IsLiveScript(_lastOpenedFile)
+            ? Live.LiveScript.DeclaredLevel(_lastOpenedFile)
+            : _data.LevelId;
+
+        if (!string.IsNullOrEmpty(target) && SceneManager.GetActiveScene().name != target)
+        {
+#if !LEGACY
+            GameManager.GM.TriggerScenePreUnload();
+#endif
+            SceneManager.LoadScene(target);
+
+            for (int i = 0; i < 900 && SceneManager.GetActiveScene().name != target; i++)
+                yield return null;
+        }
+
+        // Let the level settle before the next run's reset coroutine starts.
+        yield return null;
+        yield return null;
+
+        if (!_playingBack && !_recording && !_resetting)
+        {
+            StartPlayback();
+        }
+        else
+        {
+            Debug.LogError("[bench] could not restart playback; remaining runs abandoned.");
+            Bench.Summary();
+        }
     }
 
     private void IncreasePlaybackSpeed()
@@ -404,7 +458,8 @@ public sealed class DemoRecorder : MonoBehaviour
 
     private void ApplyPlaybackSpeed()
     {
-        ApplySpeed(PlaybackSpeeds[_playbackSpeedIndex] / 50f);
+        ApplySpeed(_usingCustomSpeed ? _customSpeedMultiplier
+            : PlaybackSpeeds[_playbackSpeedIndex] / 50f);
     }
 
     private void ApplySpeed(float multiplier)
@@ -434,7 +489,9 @@ public sealed class DemoRecorder : MonoBehaviour
         _liveProducedFrame = f;
         try
         {
+            var b = Bench.T0();
             _live.Advance();
+            Bench.T1(Bench.LiveAdvance, b);
         }
         catch (MoonSharp.Interpreter.InterpreterException lex)
         {
@@ -517,7 +574,18 @@ public sealed class DemoRecorder : MonoBehaviour
         // Only check for file changes if we have a loaded file and we're not currently recording or resetting
         if (string.IsNullOrWhiteSpace(_lastOpenedFile) || _recording || _resetting)
             return;
+        
+        // Limit check speed.
+        if (Time.realtimeSinceStartup < _nextFileCheck) return;
+        _nextFileCheck = Time.realtimeSinceStartup + 0.5f;
 
+        var b = Bench.T0();
+        CheckForFileChangesCore();
+        Bench.T1(Bench.FileWatch, b);
+    }
+
+    private void CheckForFileChangesCore()
+    {
         try
         {
             if (!File.Exists(_lastOpenedFile))
@@ -654,6 +722,8 @@ public sealed class DemoRecorder : MonoBehaviour
 
             TASInput.disablePause = true;
             TASInput.StartPlayback(this);
+
+            Bench.Begin();
         }));
     }
 
@@ -739,10 +809,37 @@ public sealed class DemoRecorder : MonoBehaviour
 
     private int GetCurrentCheckpointIndex()
     {
-        var saveManager = GameManager.GM.GetComponent<SaveAndCheckpointManager>();
-        if (saveManager == null) return -1;
+        var b = Bench.T0();
+        var index = GetCurrentCheckpointIndexCore();
+        Bench.T1(Bench.CheckpointIdx, b);
+        return index;
+    }
 
+    private int GetCurrentCheckpointIndexCore()
+    {
         if (SaveGamePatch.currentCheckpoint == null) return -1;
+
+        var checkpoints = Checkpoints();
+
+        // No RoomOrder means no defined ordering, same as before the cache.
+        if (!_checkpointsSorted) return -1;
+
+        return Array.IndexOf(checkpoints, SaveGamePatch.currentCheckpoint);
+    }
+
+    // Checkpoints are static level geometry, so this list stays valid for the whole scene
+    private CheckPoint[] _checkpoints;
+    private bool _checkpointsSorted;
+
+    /// <summary>
+    /// Every CheckPoint in the level, in room order when the level has a RoomOrder
+    /// cached until the scene changes
+    /// </summary>
+    private CheckPoint[] Checkpoints()
+    {
+        if (_checkpoints != null &&
+            (_checkpoints.Length == 0 || _checkpoints[0] != null))
+            return _checkpoints;
 
         // TODO: This can probably go back to LINQ as long as we make sure to GetComponent<CheckPoint> on Legacy
 #if LEGACY
@@ -757,34 +854,42 @@ public sealed class DemoRecorder : MonoBehaviour
 #endif
 
         RoomOrder roomOrder = GameObject.FindObjectOfType<RoomOrder>();
-        if (roomOrder)
+        _checkpointsSorted = roomOrder != null;
+
+        if (_checkpointsSorted)
         {
-            // Manual bubble sort - IL2CPP compatible
-            for (int i = 0; i < array.Length - 1; i++)
+            // Pull each room index out once, then
+            // insertion-sort on the cached keys
+            int[] order = new int[array.Length];
+            for (int i = 0; i < array.Length; i++)
+                order[i] = roomOrder.GetRoomIndex(array[i].transform.parent);
+
+            for (int i = 1; i < array.Length; i++)
             {
-                for (int j = i + 1; j < array.Length; j++)
+                CheckPoint cp = array[i];
+                int key = order[i];
+                int j = i - 1;
+                while (j >= 0 && order[j] > key)
                 {
-                    int iOrder = roomOrder.GetRoomIndex(array[i].transform.parent);
-                    int jOrder = roomOrder.GetRoomIndex(array[j].transform.parent);
-
-                    if (iOrder > jOrder)
-                    {
-                        CheckPoint temp = array[i];
-                        array[i] = array[j];
-                        array[j] = temp;
-                    }
+                    array[j + 1] = array[j];
+                    order[j + 1] = order[j];
+                    j--;
                 }
+                array[j + 1] = cp;
+                order[j + 1] = key;
             }
-
-            return Array.IndexOf(array, SaveGamePatch.currentCheckpoint);
         }
 
-        return -1;
+        _checkpoints = array;
+        return _checkpoints;
     }
 
     // Public wrapper so the live-script bridge can read the current checkpoint.
     public int CurrentCheckpointIndex() => GetCurrentCheckpointIndex();
-    
+
+    /// <summary>How many checkpoints this level has. Shares the cached list.</summary>
+    public int CheckpointCount() => Checkpoints().Length;
+
     #endregion
 
     #region Scene Reset
@@ -865,6 +970,9 @@ public sealed class DemoRecorder : MonoBehaviour
 
     private void OnLoadSetup(Scene scene, LoadSceneMode mode)
     {
+        // The cached checkpoints belong to the scene we just left.
+        _checkpoints = null;
+
         if (_playingBack && _live != null && !String.IsNullOrEmpty(_liveLevel) && scene.name != _liveLevel)
         {
             Debug.Log("Level finished on frame " + CurrentFrame + "; ending live run.");

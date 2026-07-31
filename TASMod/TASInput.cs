@@ -17,6 +17,7 @@ internal static class TASInput
 
     internal static bool GetButton(string actionName, bool originalResult)
     {
+        if (Bench.Active) Bench.InputPolls++;
         if (blockAllInput) return false;
 
         return passthrough || !DemoActions.Buttons.Contains(actionName)
@@ -25,6 +26,7 @@ internal static class TASInput
     }
     internal static bool GetButtonDown(string actionName, bool originalResult)
     {
+        if (Bench.Active) Bench.InputPolls++;
         if (blockAllInput) return false;
 
         if (actionName == "Pause" && disablePause)
@@ -37,6 +39,7 @@ internal static class TASInput
 
     internal static bool GetButtonUp(string actionName, bool originalResult)
     {
+        if (Bench.Active) Bench.InputPolls++;
         if (blockAllInput) return false;
 
         return passthrough || !DemoActions.Buttons.Contains(actionName)
@@ -46,6 +49,7 @@ internal static class TASInput
 
     internal static float GetAxis(string actionName, float originalResult)
     {
+        if (Bench.Active) Bench.InputPolls++;
         if (blockAllInput) return 0f;
 
         return passthrough || !DemoActions.Axes.Contains(actionName)

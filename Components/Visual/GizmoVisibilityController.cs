@@ -36,8 +36,8 @@ class GizmoVisibilityController : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode loadMode)
     {
-        SetDefaultTriggerBoxMaterial();
         SetCameraCullingMask();
+        if (ShowGizmos) SetDefaultTriggerBoxMaterial();
     }
 
     public void ToggleGizmosVisible()
@@ -85,14 +85,15 @@ class GizmoVisibilityController : MonoBehaviour
         var mat = _triggerBoxMaterial;
 
         var objs = GameObject.FindGameObjectsWithTag("_Interactive");
-
+        int noClipLayer = LayerMask.NameToLayer("NoClipCamera");
+        
         foreach (var obj in objs)
         {
             foreach (var renderer in obj.GetComponentsInChildren<MeshRenderer>())
             {
-                if (renderer.gameObject.layer == LayerMask.NameToLayer("NoClipCamera"))
+                if (renderer.gameObject.layer == noClipLayer)
                 {
-                    renderer.material = mat;
+                    renderer.sharedMaterial = mat;
                 }
             }
         }

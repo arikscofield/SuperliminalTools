@@ -1,3 +1,4 @@
+using SuperliminalTools.TASMod.Demo;
 using UnityEngine;
 
 namespace SuperliminalTools.Components.Visual;
@@ -50,16 +51,26 @@ public class PathProjector : MonoBehaviour
         // Get renderer
         capsuleRenderer = visualCapsule.GetComponent<MeshRenderer>();
 
-        capsuleRenderer.material = visualizationMaterial;
+        capsuleRenderer.sharedMaterial = visualizationMaterial;
     }
 
     void Update()
     {
-        if (characterController != null)
+        if (characterController == null) return;
+        
+        // The visual lives on the NoClipCamera layer, which is culled unless gizmos are on
+        var gizmos = GizmoVisibilityController.Instance;
+        if (gizmos == null || !gizmos.ShowGizmos)
         {
-            ProjectPath();
-            UpdateVisualization();
+            if (capsuleRenderer != null && capsuleRenderer.enabled) capsuleRenderer.enabled = false;
+            hasHit = false;
+            return;
         }
+        
+        var b = Bench.T0();
+        ProjectPath();
+        UpdateVisualization();
+        Bench.T1(Bench.PathProjector, b);
     }
 
     public void ProjectPath()

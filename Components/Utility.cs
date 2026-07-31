@@ -15,9 +15,13 @@ namespace SuperliminalTools.Components;
 
 public static class Utility
 {
+    
+    private static Shader _standard;
+    
     public static Material GetTransparentMaterial(Color color)
     {
-        Material mat = new(Shader.Find("Standard"));
+        if (_standard == null) _standard = Shader.Find("Standard");
+        Material mat = new(_standard);
 
         // Set rendering mode to transparent
         mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);

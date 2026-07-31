@@ -138,7 +138,7 @@ public sealed class GameState
 
     // How many checkpoints this level has
     public int checkpoint_count()
-        => Object.FindObjectsOfType<CheckPoint>().Length;
+        => DemoRecorder.Instance != null ? DemoRecorder.Instance.CheckpointCount() : 0;
 
     // ---- vectors (returned as multiple Lua values: x, y, z) -------------
 

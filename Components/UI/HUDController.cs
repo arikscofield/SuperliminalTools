@@ -49,6 +49,8 @@ class HUDController : MonoBehaviour
     private Text _hudText;
     private Font _notoMonoFont;
     private DemoRecorder _recorder;
+    
+    private float _nextHudUpdate;
 
     private void Awake()
     {
@@ -77,7 +79,26 @@ class HUDController : MonoBehaviour
     private void LateUpdate()
     {
         if (_hudText == null) return;
+        
+        // Fast-forward: nothing is being drawn, so don't pay for the text rebuild.
+        var rdc = Visual.RenderDistanceController.Instance;
+        if (rdc != null && rdc.DisableRendering) return;
+        
+        // Above 1x, cap the canvas rebuild at
+        // ~30 Hz of real time so the HUD costs less as the game gets faster
+        if (Application.targetFrameRate > 50)
+        {
+            if (Time.realtimeSinceStartup < _nextHudUpdate) return;
+            _nextHudUpdate = Time.realtimeSinceStartup + 1f / 30f;
+        }
 
+        var b = Bench.T0();
+        BuildHud();
+        Bench.T1(Bench.Hud, b);
+    }
+
+    private void BuildHud()
+    {
         _recorder = DemoRecorder.Instance;
 
         var hudLines = "";

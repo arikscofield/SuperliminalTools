@@ -23,6 +23,10 @@ public sealed class TASModController : MonoBehaviour
     public static TASModController Instance { get; private set; }
 
     private bool _unlimitedRenderDistance;
+    
+    private bool _hkShowLess;
+    private PlaybackState _hkState;
+    private bool _hkValid;
 
     private void Awake()
     {
@@ -50,6 +54,12 @@ public sealed class TASModController : MonoBehaviour
 
     private void SetHotkeyText()
     {
+        var showLess = HUDController.Instance.ShowLess;
+        var state = DemoRecorder.Instance.State;
+        if (_hkValid && showLess == _hkShowLess && state == _hkState) return;
+        _hkShowLess = showLess; _hkState = state; _hkValid = true;
+        
+        
         var output = "";
 
         var detailString = HUDController.Instance.ShowLess ? "Show More" : "Show Less";
