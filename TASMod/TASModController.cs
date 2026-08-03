@@ -82,6 +82,7 @@ public sealed class TASModController : MonoBehaviour
                 case PlaybackState.Stopped:
                     output += "F4  NoClip\n";
                     output += "F5  Play\nF6  Record\nF7  Record from CP\n";
+                    output += "F9  Flashlight\n";
                     output += "F11 Open\nF12 Save\n";
                     break;
             }
@@ -119,6 +120,11 @@ public sealed class TASModController : MonoBehaviour
                 NoClipController.Instance.ToggleNoClipStyle();
             else
                 NoClipController.Instance.ToggleNoClip();
+        }
+        
+        if (Input.GetKeyDown(KeyCode.F9))
+        {
+            FlashlightController.Instance.SetEnabled(!FlashlightController.Instance.FlashlightEnabled);
         }
 
         if (NoClipController.Instance.NoClipEnabled)

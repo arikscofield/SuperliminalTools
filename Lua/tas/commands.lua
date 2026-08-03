@@ -95,7 +95,48 @@ function Commands.build(sink, game)
             " (expected one of: " .. table.concat(Frame.BUTTONS, ", ") .. ")")
         return name
     end
+	
+	
+	-- Shortest signed turn from yaw `a` to yaw `b`, in degrees (-180..180].
+	local function yaw_delta(a, b)
+		local d = (b - a) % 360
+		if d > 180 then d = d - 360 end
+		return d
+	end
 
+	-- Wrap a yaw-producing function so its first `frames` frames sweep from the
+	-- direction the player is actually travelling round to the requested one.
+	-- Snapping the move vector in a single frame throws away speed; walking it
+	-- round over a few frames keeps most of it. Standing still, there's no
+	-- momentum to preserve, so the ease is skipped.
+	local function ease_yaw(get_yaw, frames)
+		if not frames or frames < 1 then return get_yaw end
+		local start = game.travel_yaw()
+		if start == -999 then return get_yaw end
+		local step = 0
+		return function()
+			local yaw = get_yaw()
+			if yaw == nil then return nil end
+			step = step + 1
+			if step >= frames then return yaw end
+			return start + yaw_delta(start, yaw) * (step / frames)
+		end
+	end
+
+	-- Build a move_lock out of a yaw source: constant speed, eased heading.
+	local function move_lock_for(get_yaw, speed, ease)
+		speed = speed or 1
+		local eased = ease_yaw(get_yaw, ease)
+		return function()
+			local yaw = eased()
+			if yaw == nil then return 0, 0 end
+			return game.move_axes_for(yaw, speed)
+		end
+	end
+
+
+
+	------------------------------------------------------------------------------------------
     -- The single primitive. Builds one frame from sticky state + overrides
     -- and hands it to the sink `count` times.
     local function emit(count, overrides)
@@ -420,43 +461,40 @@ function Commands.build(sink, game)
 	
 	-- Lock movement to a world direction no matter the viewing angle. Same angle convention as look:
     -- 0 = +Z, 90 = +X. speed is a fraction of max, 0..1.
-    function tas.lock_move(yaw, speed)
+	-- `ease` (frames) turns the move vector gradually from your current travel
+	-- direction instead of snapping it, which preserves speed through the turn.
+    function tas.lock_move(yaw, speed, ease)
         need_game()
-        move_lock = function() return game.move_axes_for(yaw or 0, speed or 1) end
+        yaw = yaw or 0
+        move_lock = move_lock_for(function() return yaw end, speed, ease)
         return tas
     end
 
     -- Lock to whatever direction you're facing right now, then keep going that
     -- way regardless of where you look afterwards.
-    function tas.lock_move_forward(speed)
+    function tas.lock_move_forward(speed, ease)
         need_game()
-        return tas.lock_move(game.facing(), speed)
+        return tas.lock_move(game.facing(), speed, ease)
     end
 
     -- Walk at a world point, re-aiming every frame. Movement cuts out once
     -- within `tol` metres so you don't oscillate around it. y is ignored.
-    function tas.lock_move_to_point(x, z, speed, tol)
+    function tas.lock_move_to_point(x, z, speed, tol, ease)
         need_game()
         tol = tol or 0.25
-        move_lock = function()
-            local yaw = yaw_toward(x, z, tol)
-            if not yaw then return 0, 0 end
-            return game.move_axes_for(yaw, speed or 1)
-        end
+        move_lock = move_lock_for(function() return yaw_toward(x, z, tol) end, speed, ease)
         return tas
     end
 
 	-- Walk to a given object handle
-    function tas.lock_move_at(handle, speed, tol)
+    function tas.lock_move_at(handle, speed, tol, ease)
         need_game()
         assert(handle, "lock_move_at: nil handle")
         tol = tol or 0.25
-        move_lock = function()
+        move_lock = move_lock_for(function()
             local tx, _, tz = game.target_pos(handle)
-            local yaw = yaw_toward(tx, tz, tol)
-            if not yaw then return 0, 0 end
-            return game.move_axes_for(yaw, speed or 1)
-        end
+            return yaw_toward(tx, tz, tol)
+        end, speed, ease)
         return tas
     end
 
