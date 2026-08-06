@@ -244,12 +244,12 @@ function Commands.build(sink, game)
     end
 	
 	
-	-- Jump straight to a checkpoint. Use it to skip the parts of a run you're not working on.
+	-- Jump straight to a checkpoint
     function tas.warp_to_checkpoint(index)
         need_game()
         game.warp_to_checkpoint(index)
         emit(1)                          -- warp lands at the end of this frame
-        return tas.wait_until_grounded(60)
+        return tas
     end
 
     ------------------------------------------------------------------- time / waits
@@ -294,6 +294,21 @@ function Commands.build(sink, game)
         need_game()
         return tas.wait_until(function() return game.is_ready_to_grab() end, max)
     end
+
+	-- Wait until the reticle is over something clickable (vending machine buttons, some alarm clocks, etc)
+	-- clickables have no DropTriggerScript, so wait_until_grabbable() will never see them.
+	function tas.wait_until_interactable(max)
+        need_game()
+        return tas.wait_until(function() return game.is_ready_to_interact() end, max)
+    end
+
+	-- Wait until the reticle is over anything you can act on: grabbable OR clickable.
+	function tas.wait_until_actionable(max)
+        need_game()
+        return tas.wait_until(function()
+            return game.is_ready_to_grab() or game.is_ready_to_interact()
+        end, max)
+    end
 	
 	-- Wait until an axis ("x"/"y"/"z") of the player position is above `value`
 	function tas.wait_until_above(axis, value, max)
@@ -332,8 +347,8 @@ function Commands.build(sink, game)
         -- Wait until the game registers a new checkpoint (index goes up).
     function tas.wait_until_checkpoint(max)
         need_game()
-        local start = game.checkpoint_index()
-        return tas.wait_until(function() return game.checkpoint_index() > start end, max)
+        local start = game.checkpoint_epoch()
+        return tas.wait_until(function() return game.checkpoint_epoch() ~= start end, max)
     end
 
 

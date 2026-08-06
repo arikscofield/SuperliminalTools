@@ -972,6 +972,8 @@ public sealed class DemoRecorder : MonoBehaviour
     {
         // The cached checkpoints belong to the scene we just left.
         _checkpoints = null;
+        SaveGamePatch.currentCheckpoint = null;
+        SaveGamePatch.epoch = 0;
 
         if (_playingBack && _live != null && !String.IsNullOrEmpty(_liveLevel) && scene.name != _liveLevel)
         {

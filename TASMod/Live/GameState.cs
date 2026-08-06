@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
+using HarmonyLib;
 using MoonSharp.Interpreter;
+using SuperliminalTools.Patches;
 using SuperliminalTools.TASMod.Demo;
 using UnityEngine;
 
@@ -77,6 +79,38 @@ public sealed class GameState
         return rs != null && rs.isReadyToGrab;
     }
     
+    private static DrawCursorScriptHand CursorHand
+    {
+        get
+        {
+            var gui = GameManager.GM != null ? GameManager.GM.guiCamera : null;
+            return gui != null ? gui.GetComponent<DrawCursorScriptHand>() : null;
+        }
+    }
+
+#if !LEGACY
+    // private on Mono; Il2CppInterop exposes it as a property on the legacy builds.
+    private static System.Reflection.FieldInfo _drawInteract;
+#endif
+
+    /// <summary>
+    /// True when the game is showing the interact ("click") cursor -- vending machine
+    /// buttons, some alarm clocks, etc. anything driven by MOSTTriggerOnClick[Children].
+    /// </summary>
+    public bool is_ready_to_interact()
+    {
+        var c = CursorHand;
+        if (c == null) return false;
+#if LEGACY
+        return c.drawInteractTexture;
+#else
+        _drawInteract ??= AccessTools.Field(typeof(DrawCursorScriptHand), "drawInteractTexture");
+        return (bool)_drawInteract.GetValue(c);
+#endif
+    }
+    
+    
+    
     // True when a spinnable object is in hand (Rotate would spin it)
     public bool can_spin()
     {
@@ -128,6 +162,8 @@ public sealed class GameState
     {
         return DemoRecorder.Instance != null ? DemoRecorder.Instance.CurrentCheckpointIndex() : -1;
     }
+
+    public int checkpoint_epoch() => SaveGamePatch.epoch;
     
     // Instantly move the player to a checkpoint (no reload).
     // lands at the end of the frame it's requested on

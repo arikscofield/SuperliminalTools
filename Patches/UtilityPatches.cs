@@ -34,9 +34,13 @@ public class SaveGamePatch
 {
     public static CheckPoint currentCheckpoint;
 
+    // Timestamp bumped whenever a new checkpoint is saved
+    public static int epoch;
+
     static void Prefix(CheckPoint checkpoint)
     {
         Debug.Log(Time.time + ": _SaveGame() " + checkpoint?.transform.parent.name);
+        if (checkpoint != currentCheckpoint) epoch++;
         currentCheckpoint = checkpoint;
     }
 }
